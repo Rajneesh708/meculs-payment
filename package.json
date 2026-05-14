@@ -1,0 +1,10 @@
+{
+  "name": "meculs-payment",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MECULS — Razorpay payment verification functions (Vercel serverless)",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  }
+}
