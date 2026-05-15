@@ -23,11 +23,22 @@
    (Razorpay's unit): ₹149 = 14900 paise. If you change a price,
    change it here — the browser cannot override it. */
 const PRODUCTS = {
+  /* Flow A — pay then submit a form (gated submit page) */
   "cv-upgrade":             { amount: 14900,   label: "MECULS — CV Upgrade" },
-  "personality-profiling":  { amount: 949900,  label: "MECULS — Personality Profiling" }
-  /* Flow B products (coaching, wellness) can be added here later
-     when their checkout is migrated. For now this file serves the
-     two products that lead to a submit form. */
+  "personality-profiling":  { amount: 949900,  label: "MECULS — Personality Profiling" },
+
+  /* Flow B — pay then book a Cal.com session (no gate, lands on pay-success) */
+  "single-coaching":        { amount: 144900,  label: "MECULS — Single Coaching Session" },
+  "coaching-block":         { amount: 599900,  label: "MECULS — 4-Session Coaching Block" },
+  "retainer":               { amount: 1199900, label: "MECULS — 3-Month Coaching Retainer" },
+
+  "wellness-anxiety":       { amount: 99900,   label: "MECULS — Anxiety, Burnout & Emotional Weight" },
+  "wellness-pattern":       { amount: 99900,   label: "MECULS — The Pattern That Keeps Coming Back" },
+  "wellness-grief":         { amount: 99900,   label: "MECULS — Grief, Crisis & Relationship Loss" },
+  "wellness-addiction":     { amount: 99900,   label: "MECULS — Breaking Free of an Addiction" },
+  "wellness-parent":        { amount: 99900,   label: "MECULS — Parent Conversation" },
+  "wellness-child":         { amount: 99900,   label: "MECULS — Child Session" },
+  "wellness-meditation":    { amount: 14900,   label: "MECULS — Long-Held Pain Meditation" }
 };
 
 export default async function handler(req, res) {
