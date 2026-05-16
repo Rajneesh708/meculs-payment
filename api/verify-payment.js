@@ -17,6 +17,14 @@
    payment is actually "captured" (money truly taken), then
    return a signed access token the submit page can trust.
 
+   For products that lead to a Cal.com booking (coaching + 7
+   wellness sessions), this function ALSO returns a separate,
+   short-lived booking_token. The browser sends that token to
+   /api/redeem-booking-token to receive the real Cal.com URL.
+   The Cal.com URLs themselves are NEVER returned to the browser
+   here — they live only in the server-side map below, and only
+   in /api/redeem-booking-token.
+
    If invalid: the customer gets nothing. No token, no access.
 
    Secret used (Vercel env var, never in git):
@@ -25,6 +33,24 @@
    ============================================================ */
 
 import crypto from "crypto";
+
+/* ============================================================
+   Products that route to a Cal.com booking after payment.
+   This list lives on the server only. The browser never sees it.
+   To add a new bookable product: add its product code here.
+   ============================================================ */
+const CAL_BOOKING_PRODUCTS = new Set([
+  "single-coaching",
+  "coaching-block",
+  "retainer",
+  "wellness-anxiety",
+  "wellness-pattern",
+  "wellness-grief",
+  "wellness-addiction",
+  "wellness-parent",
+  "wellness-child",
+  "wellness-meditation"
+]);
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "https://meculs.com");
@@ -119,6 +145,8 @@ export default async function handler(req, res) {
     return;
   }
 
+  const now = Date.now();
+
   /* ---- Issue a short-lived access token ----
      This token is what the submit page checks. It is signed with
      ACCESS_TOKEN_SECRET, so the submit page (via this same server)
@@ -128,10 +156,10 @@ export default async function handler(req, res) {
     payment_id: paymentId,
     order_id:   orderId,
     product:    productCode,
-    issued_at:  Date.now(),
+    issued_at:  now,
     /* valid for 2 hours — long enough to fill the form, short
        enough that a leaked URL is not useful for long. */
-    expires_at: Date.now() + 2 * 60 * 60 * 1000
+    expires_at: now + 2 * 60 * 60 * 1000
   };
 
   const payloadB64 = Buffer.from(JSON.stringify(tokenPayload)).toString("base64url");
@@ -141,9 +169,41 @@ export default async function handler(req, res) {
     .digest("base64url");
   const accessToken = payloadB64 + "." + tokenSig;
 
+  /* ---- Issue a booking token (for Cal.com products only) ----
+     Separate from the access token because:
+       - shorter expiry (30 minutes vs 2 hours)
+       - serves a different gate (book.html, not the submit pages)
+       - keeps the two concerns cleanly separated
+
+     The booking token contains ONLY the product code + expiry.
+     It does NOT contain the Cal.com URL. The browser sends this
+     token to /api/redeem-booking-token, which looks up the URL
+     from its own server-side map and returns it.
+
+     The customer cannot forge a token — they don't have the
+     tokenSecret. They cannot use a token for a different product
+     — the product code is signed in. They cannot reuse an old
+     token — it expires in 30 minutes. */
+  let bookingToken = null;
+  if (productCode && CAL_BOOKING_PRODUCTS.has(productCode)) {
+    const bookingPayload = {
+      product:    productCode,
+      payment_id: paymentId,
+      issued_at:  now,
+      expires_at: now + 30 * 60 * 1000   /* 30 minutes */
+    };
+    const bookingPayloadB64 = Buffer.from(JSON.stringify(bookingPayload)).toString("base64url");
+    const bookingSig = crypto
+      .createHmac("sha256", tokenSecret)
+      .update(bookingPayloadB64)
+      .digest("base64url");
+    bookingToken = bookingPayloadB64 + "." + bookingSig;
+  }
+
   res.status(200).json({
     verified: true,
     access_token: accessToken,
+    booking_token: bookingToken,   /* null for non-Cal.com products */
     product: productCode,
     payment_id: paymentId
   });
